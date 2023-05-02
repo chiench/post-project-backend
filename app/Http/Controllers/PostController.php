@@ -11,8 +11,29 @@ class PostController extends Controller
 
     public function getListPost(Request $request)
     {
-        $post = Post::get();
-        return response()->json(['data' => $post], 200);
+        $per_page = $request->get('per_page', 20);
+        $page = $request->get('page', 1);
+        $query = Post::query();
+        $query = $this->filterIndex($query, $request);
+        $data = $query->orderBy('updated_at', 'desc')
+            ->paginate($per_page, ['*'], 'page', $page);
+        return response()->json($data, 200);
+    }
+    public function filterIndex($query, $request)
+    {
+        $search = $request->has('search') ? $request->get('search') : null;
+        if (!is_null($search)) {
+            $search = trim($search);
+            $query->where('title', 'like', '%' . $search . '%')
+                ->orWhere('content', 'like', '%' . $search . '%');
+        }
+        return $query;
+    }
+    public function getDetalsPost($id)
+    {
+        $data = Post::find($id);
+        return response()->json(['data' => $data], 200);
+
     }
     public function addPost(Request $request)
     {
@@ -28,14 +49,14 @@ class PostController extends Controller
             'content' => 'required',
         ], $messages);
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 200);
+            return response()->json(['error' => $validator->errors()], 422);
         }
         $validated = $validator->validated();
-        // dd($validated);
         $post = Post::create($validated);
         return response()->json([
             'data' => $post,
-            'message' => 'Thêm mới thành công'
+            'message' => 'Thêm mới thành công',
+            'status' => 200,
         ], 200);
 
     }
@@ -52,7 +73,7 @@ class PostController extends Controller
             'content' => 'required',
         ], $messages);
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 200);
+            return response()->json(['error' => $validator->errors()], 422);
         }
         $validated = $validator->validated();
         $post = tap(Post::findOrFail($id))->update($validated)->fresh();
@@ -67,7 +88,8 @@ class PostController extends Controller
         $post = tap(Post::findOrFail($id))->delete()->fresh();
         return response()->json([
             'data' => $post,
-            'message' => 'Cập nhật thành công'
-        ], 200);
+            'message' => 'Xóa thành công',
+            'status' => 200,
+        ]);
     }
 }
